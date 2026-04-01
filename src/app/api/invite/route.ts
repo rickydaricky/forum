@@ -7,6 +7,13 @@ export async function POST(request: Request) {
   try {
     const { input, side } = await request.json();
 
+    if (side !== "a" && side !== "b") {
+      return NextResponse.json(
+        { error: "side must be 'a' or 'b'" },
+        { status: 400 }
+      );
+    }
+
     if (!input?.trim()) {
       return NextResponse.json(
         { error: "Your side is required" },
@@ -43,16 +50,19 @@ export async function POST(request: Request) {
     const id = nanoid(10);
     const inviteToken = nanoid(16);
 
-    const isA = side !== "b";
-
     await createDebate({
       id,
       mode: "invite",
       invite_token: inviteToken,
-      input_a_type: isA ? result.type : undefined!,
-      input_a_raw: isA ? result.conversation.rawText : undefined!,
-      input_b_type: !isA ? result.type : undefined!,
-      input_b_raw: !isA ? result.conversation.rawText : undefined!,
+      ...(side === "a"
+        ? {
+            input_a_type: result.type,
+            input_a_raw: result.conversation.rawText,
+          }
+        : {
+            input_b_type: result.type,
+            input_b_raw: result.conversation.rawText,
+          }),
     });
 
     return NextResponse.json({

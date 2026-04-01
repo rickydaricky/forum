@@ -11,14 +11,20 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
   const [error, setError] = useState<string | null>(null);
   const [debateId, setDebateId] = useState<string | null>(null);
   const [expired, setExpired] = useState(false);
+  const [lookupError, setLookupError] = useState(false);
+  const [resolving, setResolving] = useState(true);
 
-  // Look up the debate ID from the invite token
   useEffect(() => {
     async function lookupInvite() {
       try {
         const res = await fetch(`/api/invite/${inviteToken}`);
-        if (!res.ok) {
+        if (res.status === 404) {
           setExpired(true);
+          return;
+        }
+        if (!res.ok) {
+          console.error("Invite lookup failed with status:", res.status);
+          setLookupError(true);
           return;
         }
         const data = await res.json();
@@ -26,8 +32,11 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
         if (data.status !== "waiting_for_side_b") {
           setExpired(true);
         }
-      } catch {
-        setExpired(true);
+      } catch (err) {
+        console.error("Invite lookup error:", err);
+        setLookupError(true);
+      } finally {
+        setResolving(false);
       }
     }
     lookupInvite();
@@ -35,7 +44,10 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!debateId) return;
+    if (!debateId) {
+      setError("Invite could not be verified. Please refresh the page.");
+      return;
+    }
     setError(null);
     setLoading(true);
 
@@ -61,6 +73,17 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
     }
   }
 
+  if (resolving) {
+    return (
+      <div className="w-full max-w-xl mx-auto flex justify-center py-12">
+        <div className="flex items-center gap-3 text-zinc-400">
+          <span className="w-5 h-5 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin" />
+          Verifying invite...
+        </div>
+      </div>
+    );
+  }
+
   if (expired) {
     return (
       <div className="w-full max-w-xl mx-auto text-center">
@@ -74,6 +97,24 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
           >
             Start Your Own Debate
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (lookupError) {
+    return (
+      <div className="w-full max-w-xl mx-auto text-center">
+        <div className="p-6 rounded-xl bg-surface border border-border">
+          <p className="text-zinc-400 mb-4">
+            Something went wrong verifying this invite. Please try again.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-block px-6 py-2.5 rounded-full bg-white text-black font-medium text-sm hover:bg-zinc-200 transition-colors"
+          >
+            Refresh
+          </button>
         </div>
       </div>
     );
@@ -104,7 +145,7 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
       <div className="mt-6 flex justify-center">
         <button
           type="submit"
-          disabled={loading || !input.trim() || !debateId}
+          disabled={loading || !input.trim()}
           className="px-8 py-3 rounded-full bg-white text-black font-semibold text-base transition-all hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white"
         >
           {loading ? (

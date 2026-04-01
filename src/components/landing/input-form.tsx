@@ -78,7 +78,9 @@ export function InputForm() {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       },
-      () => {}
+      () => {
+        setError("Failed to copy. Please select and copy the link manually.");
+      }
     );
   }
 

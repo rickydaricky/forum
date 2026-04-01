@@ -17,8 +17,8 @@ export async function createDebate(debate: {
   id: string;
   mode?: DebateMode;
   invite_token?: string;
-  input_a_type: InputType;
-  input_a_raw: string;
+  input_a_type?: InputType;
+  input_a_raw?: string;
   input_b_type?: InputType;
   input_b_raw?: string;
 }): Promise<Debate> {
@@ -95,6 +95,36 @@ export async function updateDebate(
     .eq("id", id);
 
   if (error) throw new Error(`Failed to update debate: ${error.message}`);
+}
+
+/**
+ * Atomically join a debate — only succeeds if status is still waiting_for_side_b.
+ * Returns true if the join succeeded, false if the debate was already joined.
+ */
+export async function joinDebate(
+  id: string,
+  inviteToken: string,
+  updates: {
+    input_a_type?: InputType;
+    input_a_raw?: string;
+    input_b_type?: InputType;
+    input_b_raw?: string;
+  }
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("debates")
+    .update({ ...updates, status: "pending" })
+    .eq("id", id)
+    .eq("invite_token", inviteToken)
+    .eq("status", "waiting_for_side_b")
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return false; // no row matched — already joined
+    throw new Error(`Failed to join debate: ${error.message}`);
+  }
+  return !!data;
 }
 
 export async function appendPhase(

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDebate, updateDebate } from "@/lib/db";
+import { getDebate, joinDebate } from "@/lib/db";
 import { scrapeInput } from "@/lib/scraper";
 
 export async function POST(
@@ -32,24 +32,10 @@ export async function POST(
     }
 
     const debate = await getDebate(id);
-    if (!debate) {
-      return NextResponse.json(
-        { error: "Debate not found" },
-        { status: 404 }
-      );
-    }
-
-    if (debate.invite_token !== inviteToken) {
+    if (!debate || debate.invite_token !== inviteToken) {
       return NextResponse.json(
         { error: "Invalid invite link" },
         { status: 403 }
-      );
-    }
-
-    if (debate.status !== "waiting_for_side_b") {
-      return NextResponse.json(
-        { error: "This debate has already started" },
-        { status: 409 }
       );
     }
 
@@ -65,21 +51,19 @@ export async function POST(
       );
     }
 
-    // Determine which side is missing
+    // Determine which side is missing and do an atomic update
     const isMissingSideB = !debate.input_b_raw;
     const updates = isMissingSideB
-      ? {
-          input_b_type: result.type,
-          input_b_raw: result.conversation.rawText,
-          status: "pending" as const,
-        }
-      : {
-          input_a_type: result.type,
-          input_a_raw: result.conversation.rawText,
-          status: "pending" as const,
-        };
+      ? { input_b_type: result.type, input_b_raw: result.conversation.rawText }
+      : { input_a_type: result.type, input_a_raw: result.conversation.rawText };
 
-    await updateDebate(id, updates);
+    const joined = await joinDebate(id, inviteToken, updates);
+    if (!joined) {
+      return NextResponse.json(
+        { error: "This debate has already started" },
+        { status: 409 }
+      );
+    }
 
     return NextResponse.json({ debateId: id });
   } catch (err) {

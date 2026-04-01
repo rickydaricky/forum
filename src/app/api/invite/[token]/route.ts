@@ -5,18 +5,26 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
-  const { token } = await params;
+  try {
+    const { token } = await params;
 
-  const debate = await getDebateByInviteToken(token);
-  if (!debate) {
+    const debate = await getDebateByInviteToken(token);
+    if (!debate) {
+      return NextResponse.json(
+        { error: "Invite not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      debateId: debate.id,
+      status: debate.status,
+    });
+  } catch (err) {
+    console.error("Failed to look up invite:", err);
     return NextResponse.json(
-      { error: "Invite not found" },
-      { status: 404 }
+      { error: "Failed to look up invite. Please try again." },
+      { status: 500 }
     );
   }
-
-  return NextResponse.json({
-    debateId: debate.id,
-    status: debate.status,
-  });
 }
