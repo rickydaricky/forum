@@ -8,7 +8,7 @@ interface Props {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { id } = await params;
   return {
-    title: `Debate ${id} — The Forum`,
+    title: `Debate ${id} — Both Takes`,
     description: "Watch AI advocates debate two sides of a disagreement.",
   };
 }

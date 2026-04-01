@@ -266,7 +266,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-3">
             <Link href="/" className="text-lg font-bold hover:text-zinc-300 transition-colors">
-              The Forum
+              Both Takes
             </Link>
             <div className="flex gap-2">
               {isComplete && (

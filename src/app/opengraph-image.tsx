@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 
 export const runtime = "edge";
-export const alt = "The Forum — AI Debate & Mediation";
+export const alt = "Both Takes — AI Debate & Mediation";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -28,7 +28,7 @@ export default function Image() {
             marginBottom: 24,
           }}
         >
-          The Forum
+          Both Takes
         </div>
         <div
           style={{

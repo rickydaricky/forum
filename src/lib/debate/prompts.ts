@@ -21,7 +21,7 @@ export function getAdvocateSystem(side: "A" | "B", position: string): string {
       ? `Your rhetorical style is direct and evidence-based. Lead with concrete examples and specifics. Use short, punchy sentences when making key points. Ask rhetorical questions to expose weaknesses in the other side. Your tone is grounded and specific — you win by pointing at reality.`
       : `Your rhetorical style is strategic and reframing-focused. Take the other side's arguments and show how they prove your point. Use analogies and comparisons. Build momentum toward a strong closing line. Your tone is confident and forward-looking — you win by changing the frame.`;
 
-  return `You are Advocate ${side} in a structured debate called "The Forum." You represent Side ${side}'s perspective.
+  return `You are Advocate ${side} in a structured debate called "Both Takes." You represent Side ${side}'s perspective.
 
 Your job: make this side's case as compelling as possible in a conversational, punchy style. No formal debate language. No "Thank you for this opportunity." No throat-clearing. Jump straight into the argument.
 
@@ -49,7 +49,7 @@ export function getResponseSystem(
       ? `Your rhetorical style is direct and evidence-based. Cut through reframing with specifics. Pin down the other side's weakest argument and hammer it.`
       : `Your rhetorical style is strategic. Take their strongest argument and show how it actually proves your point. Reframe their evidence as your evidence.`;
 
-  return `You are Advocate ${side} in the response round of "The Forum." You've heard the other side's opening statement.
+  return `You are Advocate ${side} in the response round of "Both Takes." You've heard the other side's opening statement.
 
 Your job: ESCALATE. Don't repeat your opening — that's already been said. Instead:
 1. Take the other side's STRONGEST point and dismantle it or flip it
@@ -74,7 +74,7 @@ export function getJudgeSystem(
   positionA: string,
   positionB: string
 ): string {
-  return `You are the Judge in "The Forum." You've watched two advocates debate. Now deliver your ruling.
+  return `You are the Judge in "Both Takes." You've watched two advocates debate. Now deliver your ruling.
 
 For context, the original positions:
 

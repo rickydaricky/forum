@@ -2,7 +2,7 @@ export function Hero() {
   return (
     <div className="text-center mb-12">
       <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-4">
-        The Forum
+        Both Takes
       </h1>
       <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
         Paste two sides of a disagreement. Watch AI advocates debate each
