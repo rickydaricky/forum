@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.81.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/analytics": "^2.0.1",
     "cheerio": "^1.2.0",
     "nanoid": "^5.1.7",
     "next": "16.2.2",
