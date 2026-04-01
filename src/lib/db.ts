@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
-import type { Debate, InputType, PhaseRecord } from "@/types";
+import type { Debate, DebateMode, InputType, PhaseRecord } from "@/types";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -15,16 +15,18 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function createDebate(debate: {
   id: string;
+  mode?: DebateMode;
+  invite_token?: string;
   input_a_type: InputType;
   input_a_raw: string;
-  input_b_type: InputType;
-  input_b_raw: string;
+  input_b_type?: InputType;
+  input_b_raw?: string;
 }): Promise<Debate> {
   const { data, error } = await supabase
     .from("debates")
     .insert({
       ...debate,
-      status: "pending",
+      status: debate.mode === "invite" ? "waiting_for_side_b" : "pending",
       phases: [],
       total_tokens_used: 0,
     })
@@ -32,6 +34,22 @@ export async function createDebate(debate: {
     .single();
 
   if (error) throw new Error(`Failed to create debate: ${error.message}`);
+  return data as Debate;
+}
+
+export async function getDebateByInviteToken(
+  token: string
+): Promise<Debate | null> {
+  const { data, error } = await supabase
+    .from("debates")
+    .select("*")
+    .eq("invite_token", token)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw new Error(`Failed to fetch debate by invite: ${error.message}`);
+  }
   return data as Debate;
 }
 
@@ -59,6 +77,10 @@ export async function updateDebate(
     Pick<
       Debate,
       | "status"
+      | "input_a_type"
+      | "input_a_raw"
+      | "input_b_type"
+      | "input_b_raw"
       | "position_a"
       | "position_b"
       | "phases"

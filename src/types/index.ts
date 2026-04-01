@@ -9,11 +9,14 @@ export type DebatePhase =
 export type Speaker = "advocate_a" | "advocate_b" | "judge";
 
 export type DebateStatus =
+  | "waiting_for_side_b"
   | "pending"
   | "extracting"
   | "in_progress"
   | "completed"
   | "error";
+
+export type DebateMode = "both_sides" | "invite";
 
 export interface ScrapedConversation {
   source: "claude" | "chatgpt" | "raw";
@@ -37,6 +40,8 @@ export interface Debate {
   id: string;
   created_at: string;
   status: DebateStatus;
+  mode: DebateMode;
+  invite_token: string | null;
   input_a_type: InputType | null;
   input_a_raw: string;
   input_b_type: InputType | null;
