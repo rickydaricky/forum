@@ -1,0 +1,50 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --side-a: #3b82f6;
+  --side-a-dim: #1e3a5f;
+  --side-b: #f59e0b;
+  --side-b-dim: #5c3d0a;
+  --judge: #a855f7;
+  --judge-dim: #3b1f5e;
+  --surface: #141414;
+  --surface-2: #1c1c1c;
+  --border: #2a2a2a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-side-a: var(--side-a);
+  --color-side-a-dim: var(--side-a-dim);
+  --color-side-b: var(--side-b);
+  --color-side-b-dim: var(--side-b-dim);
+  --color-judge: var(--judge);
+  --color-judge-dim: var(--judge-dim);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Streaming cursor animation */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor::after {
+  content: "▊";
+  animation: blink 1s step-end infinite;
+  color: var(--foreground);
+  margin-left: 2px;
+}
