@@ -354,7 +354,20 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       }
 
       for (const phase of DEBATE_PHASES) {
-        await startPhaseStream(phase);
+        try {
+          await startPhaseStream(phase);
+        } catch {
+          // Phase may have been completed by another client — check and poll
+          const recheckRes = await fetch(`/api/debate/${debateId}`);
+          if (recheckRes.ok) {
+            const recheck: Debate = await recheckRes.json();
+            if (recheck.status === "completed" || recheck.status === "in_progress" || recheck.status === "extracting") {
+              await pollUntilComplete();
+              return;
+            }
+          }
+          throw new Error("Failed to continue debate. Please refresh the page.");
+        }
       }
     } catch (err) {
       setError(
