@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Mode = "both" | "invite";
@@ -85,6 +85,30 @@ export function InputForm() {
       }
     );
   }
+
+  // Poll for Side B submission and auto-redirect
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (!inviteDebateId) return;
+
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/debate/${inviteDebateId}`);
+        if (!res.ok) return;
+        const debate = await res.json();
+        if (debate.status !== "waiting_for_side_b") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          router.push(`/debate/${inviteDebateId}`);
+        }
+      } catch {
+        // Silently retry on next interval
+      }
+    }, 3000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [inviteDebateId, router]);
 
   return (
     <div className="w-full max-w-5xl mx-auto">
@@ -188,17 +212,10 @@ export function InputForm() {
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="text-xs text-zinc-500 mb-4">
-              The debate starts automatically once they submit their side.
-            </p>
-            {inviteDebateId && (
-              <button
-                onClick={() => router.push(`/debate/${inviteDebateId}`)}
-                className="px-6 py-2.5 rounded-full bg-white text-black font-medium text-sm hover:bg-zinc-200 transition-colors"
-              >
-                Go to Debate Page
-              </button>
-            )}
+            <div className="flex items-center justify-center gap-2 text-xs text-zinc-500">
+              <span className="w-3 h-3 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin" />
+              Waiting for the other side to submit...
+            </div>
           </div>
         </div>
       ) : (
