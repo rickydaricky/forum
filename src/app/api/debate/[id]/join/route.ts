@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { getDebate, joinDebate } from "@/lib/db";
 import { scrapeInput } from "@/lib/scraper";
+import { triggerPipeline } from "@/lib/pipeline";
 
 export async function POST(
   request: Request,
@@ -51,7 +52,6 @@ export async function POST(
       );
     }
 
-    // Determine which side is missing and do an atomic update
     const isMissingSideB = !debate.input_b_raw;
     const updates = isMissingSideB
       ? { input_b_type: result.type, input_b_raw: result.conversation.rawText }
@@ -64,6 +64,15 @@ export async function POST(
         { status: 409 }
       );
     }
+
+    // Trigger pipeline after response is sent — keeps function alive
+    after(async () => {
+      try {
+        await triggerPipeline(id);
+      } catch (err) {
+        console.error(`Pipeline trigger failed for debate ${id}:`, err);
+      }
+    });
 
     return NextResponse.json({ debateId: id });
   } catch (err) {

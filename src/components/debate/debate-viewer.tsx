@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PhaseIndicator } from "./phase-indicator";
 import { PhaseSection } from "./phase-section";
-import type { Debate, DebateEvent, DebatePhase, Speaker } from "@/types";
+import type { DebatePhase, Speaker } from "@/types";
 
 interface Turn {
   speaker: Speaker;
   content: string;
-  isStreaming?: boolean;
 }
 
 interface PhaseData {
@@ -20,6 +19,10 @@ interface PhaseData {
 
 const DEBATE_PHASES: DebatePhase[] = ["opening", "response", "ruling"];
 
+/**
+ * DebateViewer — read-only observer that connects to the SSE stream endpoint.
+ * All debate generation happens server-side. This component just renders events.
+ */
 export function DebateViewer({ debateId }: { debateId: string }) {
   const [phases, setPhases] = useState<Map<DebatePhase, PhaseData>>(new Map());
   const [currentPhase, setCurrentPhase] = useState<DebatePhase | "waiting" | "complete">("waiting");
@@ -30,11 +33,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [inputA, setInputA] = useState<string | null>(null);
   const [inputB, setInputB] = useState<string | null>(null);
   const [showInputs, setShowInputs] = useState(false);
-  const isRunningRef = useRef(false);
-  const mountedRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll only when user is near the bottom (not if they've scrolled up)
+  // Auto-scroll only when user is near the bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -44,347 +45,106 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     }
   }, [phases, currentPhase]);
 
-  const startPhaseStream = useCallback(
-    (phase: string) => {
-      return new Promise<void>((resolve, reject) => {
-        const es = new EventSource(`/api/debate/${debateId}/stream?phase=${phase}`);
-        let streamCompleted = false;
-
-        es.onmessage = (event) => {
-          try {
-            const data: DebateEvent = JSON.parse(event.data);
-
-            switch (data.type) {
-              case "phase_start":
-                // Don't update UI phase for extraction — it runs silently
-                if (data.phase !== "extraction") {
-                  setCurrentPhase(data.phase);
-                  setPhases((prev) => {
-                    const next = new Map(prev);
-                    next.set(data.phase, {
-                      phase: data.phase,
-                      turns: [],
-                      isComplete: false,
-                    });
-                    return next;
-                  });
-                }
-                break;
-
-              case "extraction_complete":
-                break;
-
-              case "text_delta":
-                // Skip rendering extraction text deltas
-                if (phase === "extraction") break;
-
-                setPhases((prev) => {
-                  const next = new Map(prev);
-                  const phaseKey =
-                    data.speaker === "judge"
-                      ? "ruling"
-                      : (phase as DebatePhase);
-                  const phaseData = next.get(phaseKey) || {
-                    phase: phaseKey,
-                    turns: [],
-                    isComplete: false,
-                  };
-
-                  const turns = [...phaseData.turns];
-                  const lastTurn = turns[turns.length - 1];
-
-                  if (lastTurn && lastTurn.speaker === data.speaker && lastTurn.isStreaming) {
-                    turns[turns.length - 1] = {
-                      ...lastTurn,
-                      content: lastTurn.content + data.content,
-                    };
-                  } else {
-                    turns.push({
-                      speaker: data.speaker,
-                      content: data.content,
-                      isStreaming: true,
-                    });
-                  }
-
-                  next.set(phaseKey, { ...phaseData, turns });
-                  return next;
-                });
-                break;
-
-              case "turn_complete":
-                if (phase === "extraction") break;
-
-                setPhases((prev) => {
-                  const next = new Map(prev);
-                  for (const [key, phaseData] of next) {
-                    const lastTurn = phaseData.turns[phaseData.turns.length - 1];
-                    if (lastTurn?.speaker === data.speaker && lastTurn.isStreaming) {
-                      const turns = [...phaseData.turns];
-                      turns[turns.length - 1] = { ...lastTurn, isStreaming: false };
-                      next.set(key, { ...phaseData, turns });
-                      break;
-                    }
-                  }
-                  return next;
-                });
-                break;
-
-              case "phase_complete":
-                streamCompleted = true;
-                if (data.phase !== "extraction") {
-                  setPhases((prev) => {
-                    const next = new Map(prev);
-                    const phaseData = next.get(data.phase);
-                    if (phaseData) {
-                      next.set(data.phase, { ...phaseData, isComplete: true });
-                    }
-                    return next;
-                  });
-                }
-                break;
-
-              case "debate_complete":
-                streamCompleted = true;
-                setIsComplete(true);
-                setCurrentPhase("complete");
-                es.close();
-                resolve();
-                return;
-
-              case "error":
-                setError(data.message);
-                es.close();
-                reject(new Error(data.message));
-                return;
-            }
-          } catch (err) {
-            console.error("Failed to parse SSE event:", err);
-            setError("Lost connection to the debate stream. Please refresh the page.");
-            es.close();
-            reject(new Error("SSE parse failure"));
-          }
-        };
-
-        es.onerror = async () => {
-          es.close();
-          if (streamCompleted) {
-            resolve();
-            return;
-          }
-          // Phase might have been completed by another client — check before failing
-          try {
-            const checkRes = await fetch(`/api/debate/${debateId}`);
-            if (checkRes.ok) {
-              const checkDebate: Debate = await checkRes.json();
-              const phaseRecord = checkDebate.phases.find((p) => p.phase === phase);
-              if (phaseRecord?.status === "complete" || checkDebate.status === "completed") {
-                resolve();
-                return;
-              }
-            }
-          } catch (checkErr) {
-            console.warn("Failed to check debate status after SSE disconnect:", checkErr);
-          }
-          reject(new Error(`Connection lost during phase: ${phase}`));
-        };
-      });
-    },
-    [debateId]
-  );
-
-  // Passive observer: poll DB every 2s and load completed phases.
-  // Used when another client is already generating the debate.
-  const pollUntilComplete = useCallback(async () => {
-    const MAX_POLL_MS = 5 * 60 * 1000; // 5 minutes
-    const pollStart = Date.now();
-    let consecutiveErrors = 0;
-
-    while (mountedRef.current) {
-      if (Date.now() - pollStart > MAX_POLL_MS) {
-        throw new Error("Debate generation timed out. Please refresh the page.");
-      }
-
-      await new Promise((r) => setTimeout(r, 2000));
-      if (!mountedRef.current) return;
-
-      let debate: Debate;
-      try {
-        const res = await fetch(`/api/debate/${debateId}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        debate = await res.json();
-        consecutiveErrors = 0;
-      } catch {
-        consecutiveErrors++;
-        if (consecutiveErrors >= 5) {
-          throw new Error("Lost connection to the server. Please refresh the page.");
-        }
-        continue;
-      }
-
-      if (debate.input_a_raw) setInputA(debate.input_a_raw);
-      if (debate.input_b_raw) setInputB(debate.input_b_raw);
-
-      // Load completed phases
-      const loaded = new Map<DebatePhase, PhaseData>();
-      for (const p of debate.phases) {
-        if (p.phase === "extraction") continue;
-        if (p.status === "complete") {
-          loaded.set(p.phase, {
-            phase: p.phase,
-            turns: p.turns.map((t) => ({
-              speaker: t.speaker,
-              content: t.content,
-              isStreaming: false,
-            })),
-            isComplete: true,
-          });
-        }
-      }
-      setPhases(loaded);
-
-      // Show which phase is active
-      const activePhase = debate.phases.find((p) => p.status === "streaming");
-      if (activePhase && activePhase.phase !== "extraction") {
-        setCurrentPhase(activePhase.phase);
-      } else if (loaded.size > 0) {
-        const lastComplete = [...loaded.keys()].pop();
-        if (lastComplete) setCurrentPhase(lastComplete);
-      }
-
-      if (debate.status === "completed") {
-        setIsComplete(true);
-        setCurrentPhase("complete");
-        return;
-      }
-      if (debate.status === "error") {
-        throw new Error(debate.error_message || "Debate failed");
-      }
-    }
-  }, [debateId]);
-
-  const runAllPhases = useCallback(async () => {
-    if (isRunningRef.current) return;
-    isRunningRef.current = true;
-
-    try {
-      const res = await fetch(`/api/debate/${debateId}`);
-      if (!res.ok) {
-        throw new Error(`Failed to load debate: HTTP ${res.status}`);
-      }
-      let debate: Debate = await res.json();
-
-      // Store original inputs for display
-      if (debate.input_a_raw) setInputA(debate.input_a_raw);
-      if (debate.input_b_raw) setInputB(debate.input_b_raw);
-
-      // Poll if waiting for the other side to submit
-      if (debate.status === "waiting_for_side_b") {
-        setWaitingForSideB(true);
-        let waitErrors = 0;
-        while (debate.status === "waiting_for_side_b" && mountedRef.current) {
-          await new Promise((r) => setTimeout(r, 3000));
-          if (!mountedRef.current) break;
-          try {
-            const pollRes = await fetch(`/api/debate/${debateId}`);
-            if (!pollRes.ok) throw new Error(`HTTP ${pollRes.status}`);
-            debate = await pollRes.json();
-            waitErrors = 0;
-          } catch {
-            waitErrors++;
-            if (waitErrors >= 5) {
-              throw new Error("Lost connection. Please refresh the page.");
-            }
-            continue;
-          }
-        }
-        if (!mountedRef.current) return;
-        setWaitingForSideB(false);
-        if (debate.input_a_raw) setInputA(debate.input_a_raw);
-        if (debate.input_b_raw) setInputB(debate.input_b_raw);
-      }
-
-      // Load any completed phases (skip extraction for display)
-      if (debate.phases && debate.phases.length > 0) {
-        const loaded = new Map<DebatePhase, PhaseData>();
-        for (const p of debate.phases) {
-          if (p.phase === "extraction") continue;
-          loaded.set(p.phase, {
-            phase: p.phase,
-            turns: p.turns.map((t) => ({
-              speaker: t.speaker,
-              content: t.content,
-              isStreaming: false,
-            })),
-            isComplete: p.status === "complete",
-          });
-        }
-        setPhases(loaded);
-      }
-
-      if (debate.status === "completed") {
-        setIsComplete(true);
-        setCurrentPhase("complete");
-        return;
-      }
-
-      // If another client is already generating, become a passive observer
-      // that polls for results instead of streaming. No race conditions.
-      if (debate.status === "extracting" || debate.status === "in_progress") {
-        await pollUntilComplete();
-        return;
-      }
-
-      // We're the first client (status === "pending") — try to run the pipeline.
-      // If extraction fails (another client claimed it), fall back to polling.
-      if (!debate.position_a || !debate.position_b) {
-        try {
-          await startPhaseStream("extraction");
-        } catch {
-          // Extraction was likely claimed by another client — check and poll
-          const recheckRes = await fetch(`/api/debate/${debateId}`);
-          if (recheckRes.ok) {
-            const recheck: Debate = await recheckRes.json();
-            if (recheck.status === "extracting" || recheck.status === "in_progress" || recheck.status === "completed") {
-              await pollUntilComplete();
-              return;
-            }
-          }
-          throw new Error("Failed to start debate. Please refresh the page.");
-        }
-      }
-
-      for (const phase of DEBATE_PHASES) {
-        try {
-          await startPhaseStream(phase);
-        } catch {
-          // Phase may have been completed by another client — check and poll
-          const recheckRes = await fetch(`/api/debate/${debateId}`);
-          if (recheckRes.ok) {
-            const recheck: Debate = await recheckRes.json();
-            if (recheck.status === "completed" || recheck.status === "in_progress" || recheck.status === "extracting") {
-              await pollUntilComplete();
-              return;
-            }
-          }
-          throw new Error("Failed to continue debate. Please refresh the page.");
-        }
-      }
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
-    } finally {
-      isRunningRef.current = false;
-    }
-  }, [debateId, startPhaseStream, pollUntilComplete]);
-
+  // Single SSE connection — all state comes from server events
   useEffect(() => {
-    mountedRef.current = true;
-    runAllPhases();
-    return () => {
-      mountedRef.current = false;
+    const es = new EventSource(`/api/debate/${debateId}/stream`);
+    let connectionErrorCount = 0;
+    let parseErrorCount = 0;
+
+    es.onmessage = (event) => {
+      connectionErrorCount = 0; // Reset on successful message
+      try {
+        const data = JSON.parse(event.data);
+
+        switch (data.type) {
+          case "waiting_for_side_b":
+            setWaitingForSideB(true);
+            break;
+
+          case "phase_start":
+            setWaitingForSideB(false);
+            setCurrentPhase(data.phase as DebatePhase);
+            setPhases((prev) => {
+              const next = new Map(prev);
+              if (!next.has(data.phase)) {
+                next.set(data.phase, {
+                  phase: data.phase,
+                  turns: [],
+                  isComplete: false,
+                });
+              }
+              return next;
+            });
+            break;
+
+          case "turn":
+            setPhases((prev) => {
+              const next = new Map(prev);
+              const phaseData = next.get(data.phase) || {
+                phase: data.phase,
+                turns: [],
+                isComplete: false,
+              };
+              // Only add if we don't already have this turn
+              const alreadyHas = phaseData.turns.some(
+                (t) => t.speaker === data.speaker && t.content === data.content
+              );
+              if (!alreadyHas) {
+                next.set(data.phase, {
+                  ...phaseData,
+                  turns: [...phaseData.turns, { speaker: data.speaker, content: data.content }],
+                });
+              }
+              return next;
+            });
+            break;
+
+          case "phase_complete":
+            setPhases((prev) => {
+              const next = new Map(prev);
+              const phaseData = next.get(data.phase);
+              if (phaseData) {
+                next.set(data.phase, { ...phaseData, isComplete: true });
+              }
+              return next;
+            });
+            break;
+
+          case "debate_complete":
+            setIsComplete(true);
+            setCurrentPhase("complete");
+            if (data.inputA) setInputA(data.inputA);
+            if (data.inputB) setInputB(data.inputB);
+            es.close();
+            break;
+
+          case "error":
+            setError(data.message);
+            es.close();
+            break;
+        }
+      } catch (err) {
+        console.error("Failed to parse SSE event:", err, "Raw:", event.data);
+        parseErrorCount++;
+        if (parseErrorCount >= 3) {
+          setError("Having trouble receiving updates. Try refreshing the page.");
+        }
+      }
     };
-  }, [runAllPhases]);
+
+    es.onerror = () => {
+      // EventSource auto-reconnects. Track consecutive errors.
+      connectionErrorCount++;
+      if (connectionErrorCount >= 5) {
+        setError("Connection lost. Please refresh the page.");
+        es.close();
+      }
+    };
+
+    return () => {
+      es.close();
+    };
+  }, [debateId]);
 
   const completedPhases = new Set(
     [...phases.entries()]
@@ -392,7 +152,6 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       .map(([key]) => key)
   );
 
-  // Extract verdict from judge's ruling (last bold line)
   const judgeRuling = phases.get("ruling");
   const verdict = judgeRuling?.isComplete
     ? extractVerdict(judgeRuling.turns.find((t) => t.speaker === "judge")?.content || "")
@@ -452,7 +211,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
             </div>
           )}
 
-          {/* TL;DR Card — shown when debate is complete */}
+          {/* TL;DR Card */}
           {isComplete && verdict && (
             <div className="mb-8 p-6 rounded-xl bg-judge-dim/20 border border-judge/20">
               <div className="text-xs font-semibold text-judge uppercase tracking-wider mb-2">
@@ -472,9 +231,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
                 onClick={() => setShowInputs(!showInputs)}
                 className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
               >
-                <span
-                  className={`transition-transform ${showInputs ? "rotate-90" : ""}`}
-                >
+                <span className={`transition-transform ${showInputs ? "rotate-90" : ""}`}>
                   &#9654;
                 </span>
                 Original inputs from both sides
@@ -502,7 +259,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
             </div>
           )}
 
-          {/* Render visible debate phases (extraction is hidden) */}
+          {/* Debate phases */}
           {DEBATE_PHASES.map((phase) => {
             const phaseData = phases.get(phase);
             if (!phaseData && currentPhase !== phase) return null;
@@ -511,7 +268,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
               <PhaseSection
                 key={phase}
                 phase={phase}
-                turns={phaseData?.turns || []}
+                turns={phaseData?.turns.map((t) => ({ ...t, isStreaming: false })) || []}
                 isActive={currentPhase === phase}
               />
             );
@@ -526,15 +283,15 @@ export function DebateViewer({ debateId }: { debateId: string }) {
             </div>
           )}
 
-          {/* Waiting state — shown during silent extraction */}
-          {!waitingForSideB && (currentPhase === "waiting" || currentPhase === "extraction") && !error && (
+          {/* Analyzing state */}
+          {!waitingForSideB && (currentPhase === "waiting") && !error && (
             <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
               <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
               <p className="text-sm">Analyzing both sides...</p>
             </div>
           )}
 
-          {/* Completion state */}
+          {/* Complete */}
           {isComplete && (
             <div className="text-center py-8 text-zinc-500 text-sm">
               <p>Debate complete. Share this page to let others see the full deliberation.</p>
@@ -546,12 +303,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   );
 }
 
-/** Extract the verdict line from the judge's ruling (text after "**Verdict:**") */
 function extractVerdict(content: string): string | null {
-  // Look for **Verdict:** or **Verdict** pattern
   const match = content.match(/\*\*Verdict:?\*\*\s*([\s\S]+)/);
   if (match) {
-    // Clean up any remaining markdown bold markers
     return match[1].trim().replace(/\*\*/g, "");
   }
   return null;

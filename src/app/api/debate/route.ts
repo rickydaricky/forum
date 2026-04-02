@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { nanoid } from "nanoid";
 import { scrapeInput } from "@/lib/scraper";
 import { createDebate } from "@/lib/db";
+import { triggerPipeline } from "@/lib/pipeline";
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Scrape/parse both inputs
     let resultA, resultB;
     try {
       [resultA, resultB] = await Promise.all([
@@ -54,6 +54,15 @@ export async function POST(request: Request) {
       input_a_raw: resultA.conversation.rawText,
       input_b_type: resultB.type,
       input_b_raw: resultB.conversation.rawText,
+    });
+
+    // Trigger pipeline after response is sent — keeps function alive
+    after(async () => {
+      try {
+        await triggerPipeline(debate.id);
+      } catch (err) {
+        console.error(`Pipeline trigger failed for debate ${debate.id}:`, err);
+      }
     });
 
     return NextResponse.json({
