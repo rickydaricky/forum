@@ -219,7 +219,7 @@ export function InputForm() {
           </div>
 
           <p className="mt-3 text-xs text-zinc-500">
-            After submitting, you&apos;ll get a link to send to the other person. They won&apos;t see what you wrote.
+            After submitting, you&apos;ll get a link to send to the other person. Neither side can see the other&apos;s input until both have submitted.
           </p>
 
           {error && (
