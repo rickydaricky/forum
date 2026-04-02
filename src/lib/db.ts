@@ -83,6 +83,7 @@ export async function updateDebate(
       | "input_b_raw"
       | "position_a"
       | "position_b"
+      | "stakes"
       | "phases"
       | "error_message"
       | "total_tokens_used"

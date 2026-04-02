@@ -58,13 +58,24 @@ async function* extractPosition(
   );
 }
 
+/** Parse the STAKES line from extraction output. Returns "low", "medium", or "high". */
+function parseStakes(extractionA: string, extractionB: string): string {
+  const combined = extractionA + "\n" + extractionB;
+  const match = combined.match(/\*\*STAKES\*\*:\s*(LOW|MEDIUM|HIGH)/i);
+  if (match) {
+    return match[1].toLowerCase();
+  }
+  return "medium";
+}
+
 async function* openingStatement(
   side: "A" | "B",
   position: string,
-  opposingPosition: string
+  opposingPosition: string,
+  stakes: string
 ): AsyncGenerator<DebateEvent, string> {
   const speaker: Speaker = side === "A" ? "advocate_a" : "advocate_b";
-  const system = getAdvocateSystem(side, position);
+  const system = getAdvocateSystem(side, position, stakes);
 
   return yield* streamClaude(
     system,
@@ -83,10 +94,11 @@ async function* responseTurn(
   side: "A" | "B",
   position: string,
   openingA: string,
-  openingB: string
+  openingB: string,
+  stakes: string
 ): AsyncGenerator<DebateEvent, string> {
   const speaker: Speaker = side === "A" ? "advocate_a" : "advocate_b";
-  const system = getResponseSystem(side, position);
+  const system = getResponseSystem(side, position, stakes);
   const opposingOpening = side === "A" ? openingB : openingA;
 
   return yield* streamClaude(
@@ -110,14 +122,15 @@ export async function* runDebatePhase(
   phase: DebatePhase,
   positionA: string,
   positionB: string,
-  existingTranscript: string
+  existingTranscript: string,
+  stakes: string = "medium"
 ): AsyncGenerator<DebateEvent> {
   switch (phase) {
     case "opening": {
       yield { type: "phase_start", phase: "opening" };
 
-      const openingA = yield* openingStatement("A", positionA, positionB);
-      const openingB = yield* openingStatement("B", positionB, positionA);
+      const openingA = yield* openingStatement("A", positionA, positionB, stakes);
+      const openingB = yield* openingStatement("B", positionB, positionA, stakes);
 
       void openingA;
       void openingB;
@@ -129,7 +142,6 @@ export async function* runDebatePhase(
     case "response": {
       yield { type: "phase_start", phase: "response" };
 
-      // Extract opening statements from transcript
       const parts = existingTranscript.split("\n\n");
       let openingA = "";
       let openingB = "";
@@ -142,8 +154,8 @@ export async function* runDebatePhase(
         }
       }
 
-      yield* responseTurn("A", positionA, openingA, openingB);
-      yield* responseTurn("B", positionB, openingA, openingB);
+      yield* responseTurn("A", positionA, openingA, openingB, stakes);
+      yield* responseTurn("B", positionB, openingA, openingB, stakes);
 
       yield { type: "phase_complete", phase: "response" };
       break;
@@ -152,7 +164,7 @@ export async function* runDebatePhase(
     case "ruling": {
       yield { type: "phase_start", phase: "ruling" };
 
-      const judgeSystem = getJudgeSystem(positionA, positionB);
+      const judgeSystem = getJudgeSystem(positionA, positionB, stakes);
       yield* streamClaude(
         judgeSystem,
         [
@@ -182,23 +194,26 @@ export async function* runDebatePhase(
 }
 
 /**
- * Run the extraction phase. Returns extracted positions.
+ * Run the extraction phase. Returns extracted positions and stakes.
  */
 export async function* runExtraction(
   inputA: string,
   inputB: string
-): AsyncGenerator<DebateEvent, { positionA: string; positionB: string }> {
+): AsyncGenerator<DebateEvent, { positionA: string; positionB: string; stakes: string }> {
   yield { type: "phase_start", phase: "extraction" };
 
   const positionA = yield* extractPosition(inputA, "advocate_a");
   const positionB = yield* extractPosition(inputB, "advocate_b");
 
+  const stakes = parseStakes(positionA, positionB);
+
   yield {
     type: "extraction_complete",
     positionA,
     positionB,
+    stakes,
   };
   yield { type: "phase_complete", phase: "extraction" };
 
-  return { positionA, positionB };
+  return { positionA, positionB, stakes };
 }

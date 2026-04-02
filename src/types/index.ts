@@ -48,6 +48,7 @@ export interface Debate {
   input_b_raw: string;
   position_a: string | null;
   position_b: string | null;
+  stakes: string | null;
   phases: PhaseRecord[];
   error_message: string | null;
   total_tokens_used: number;
@@ -60,6 +61,7 @@ export type DebateEvent =
       type: "extraction_complete";
       positionA: string;
       positionB: string;
+      stakes: string;
     }
   | { type: "text_delta"; speaker: Speaker; content: string }
   | { type: "turn_complete"; speaker: Speaker }
