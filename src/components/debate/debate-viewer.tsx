@@ -28,6 +28,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [waitingForSideB, setWaitingForSideB] = useState(false);
   const [copied, setCopied] = useState(false);
   const isRunningRef = useRef(false);
+  const mountedRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll only when user is near the bottom (not if they've scrolled up)
@@ -188,12 +189,14 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       // Poll if waiting for the other side to submit
       if (debate.status === "waiting_for_side_b") {
         setWaitingForSideB(true);
-        while (debate.status === "waiting_for_side_b") {
+        while (debate.status === "waiting_for_side_b" && mountedRef.current) {
           await new Promise((r) => setTimeout(r, 3000));
+          if (!mountedRef.current) break;
           const pollRes = await fetch(`/api/debate/${debateId}`);
           if (!pollRes.ok) throw new Error(`Failed to load debate: HTTP ${pollRes.status}`);
           debate = await pollRes.json();
         }
+        if (!mountedRef.current) return;
         setWaitingForSideB(false);
       }
 
@@ -247,7 +250,11 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   }, [debateId, startPhaseStream]);
 
   useEffect(() => {
+    mountedRef.current = true;
     runAllPhases();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [runAllPhases]);
 
   const completedPhases = new Set(
