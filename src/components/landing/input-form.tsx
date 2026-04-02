@@ -163,7 +163,7 @@ export function InputForm() {
                   Setting up debate...
                 </span>
               ) : (
-                "Start the Debate"
+                "Get the Ruling"
               )}
             </button>
           </div>

@@ -154,7 +154,7 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
               Submitting...
             </span>
           ) : (
-            "Submit & Start the Debate"
+            "Submit & Get the Ruling"
           )}
         </button>
       </div>

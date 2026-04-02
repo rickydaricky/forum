@@ -115,6 +115,7 @@ export async function GET(
           const accumulator = createTurnAccumulator(phaseRecord);
           let positionA = "";
           let positionB = "";
+          let stakes = "medium";
 
           while (true) {
             const { value, done } = await gen.next();
@@ -122,9 +123,11 @@ export async function GET(
               const result = value as {
                 positionA: string;
                 positionB: string;
+                stakes: string;
               };
               positionA = result.positionA;
               positionB = result.positionB;
+              stakes = result.stakes;
               break;
             }
             send(value);
@@ -137,6 +140,7 @@ export async function GET(
             status: "in_progress",
             position_a: positionA,
             position_b: positionB,
+            stakes,
           });
         } else {
           if (!debate.position_a || !debate.position_b) {
@@ -155,7 +159,8 @@ export async function GET(
             phase,
             debate.position_a,
             debate.position_b,
-            transcript
+            transcript,
+            debate.stakes || "medium"
           );
 
           const phaseRecord: PhaseRecord = {
