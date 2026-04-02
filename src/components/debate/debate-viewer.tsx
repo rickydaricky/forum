@@ -27,6 +27,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [isComplete, setIsComplete] = useState(false);
   const [waitingForSideB, setWaitingForSideB] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [inputA, setInputA] = useState<string | null>(null);
+  const [inputB, setInputB] = useState<string | null>(null);
+  const [showInputs, setShowInputs] = useState(false);
   const isRunningRef = useRef(false);
   const mountedRef = useRef(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -186,6 +189,10 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       }
       let debate: Debate = await res.json();
 
+      // Store original inputs for display
+      if (debate.input_a_raw) setInputA(debate.input_a_raw);
+      if (debate.input_b_raw) setInputB(debate.input_b_raw);
+
       // Poll if waiting for the other side to submit
       if (debate.status === "waiting_for_side_b") {
         setWaitingForSideB(true);
@@ -198,6 +205,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         }
         if (!mountedRef.current) return;
         setWaitingForSideB(false);
+        // Update inputs now that both sides are in
+        if (debate.input_a_raw) setInputA(debate.input_a_raw);
+        if (debate.input_b_raw) setInputB(debate.input_b_raw);
       }
 
       // Load any completed phases (skip extraction for display)
@@ -331,6 +341,43 @@ export function DebateViewer({ debateId }: { debateId: string }) {
                 {verdict}
               </p>
               <p className="text-xs text-zinc-500 mt-3">Read the full debate below</p>
+            </div>
+          )}
+
+          {/* Collapsible original inputs */}
+          {inputA && inputB && !waitingForSideB && (
+            <div className="mb-6">
+              <button
+                onClick={() => setShowInputs(!showInputs)}
+                className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                <span
+                  className={`transition-transform ${showInputs ? "rotate-90" : ""}`}
+                >
+                  &#9654;
+                </span>
+                Original inputs from both sides
+              </button>
+              {showInputs && (
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-xl bg-surface border border-side-a/10 p-4">
+                    <div className="text-xs font-semibold text-side-a uppercase tracking-wider mb-2">
+                      Side A&apos;s Input
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap line-clamp-[20]">
+                      {inputA}
+                    </p>
+                  </div>
+                  <div className="rounded-xl bg-surface border border-side-b/10 p-4">
+                    <div className="text-xs font-semibold text-side-b uppercase tracking-wider mb-2">
+                      Side B&apos;s Input
+                    </div>
+                    <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap line-clamp-[20]">
+                      {inputB}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
