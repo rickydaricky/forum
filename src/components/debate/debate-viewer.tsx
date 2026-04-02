@@ -248,9 +248,28 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         return;
       }
 
-      // Run extraction silently if needed
+      // Run extraction silently if needed, or wait for it if another client started it
       if (!debate.position_a || !debate.position_b) {
-        await startPhaseStream("extraction");
+        if (debate.status === "pending") {
+          // We're the first client — run extraction
+          await startPhaseStream("extraction");
+        } else {
+          // Another client is already running extraction — poll until it's done
+          while (mountedRef.current) {
+            await new Promise((r) => setTimeout(r, 2000));
+            if (!mountedRef.current) return;
+            const pollRes = await fetch(`/api/debate/${debateId}`);
+            if (!pollRes.ok) throw new Error(`Failed to load debate: HTTP ${pollRes.status}`);
+            const pollDebate: Debate = await pollRes.json();
+            if (pollDebate.position_a && pollDebate.position_b) {
+              debate = pollDebate;
+              break;
+            }
+            if (pollDebate.status === "error") {
+              throw new Error(pollDebate.error_message || "Debate failed");
+            }
+          }
+        }
       }
 
       // Run visible debate phases, re-fetching state after each to pick up
