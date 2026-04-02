@@ -18,11 +18,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Both Takes — AI Debate & Mediation",
   description:
-    "Paste two sides of a disagreement. Watch AI advocates debate. Get a fair ruling.",
+    "Two sides. Two AI advocates. One ruling. Settle any disagreement with an impartial AI judge.",
   openGraph: {
     title: "Both Takes — AI Debate & Mediation",
     description:
-      "Paste two sides of a disagreement. Watch AI advocates debate. Get a fair ruling.",
+      "Two sides. Two AI advocates. One ruling. Settle any disagreement with an impartial AI judge.",
   },
 };
 

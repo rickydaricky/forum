@@ -130,7 +130,7 @@ export function InviteForm({ inviteToken }: { inviteToken: string }) {
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Paste your conversation with AI about this disagreement, or write your perspective directly..."
+          placeholder="Describe what happened from your perspective..."
           className="h-64 rounded-xl bg-surface border border-side-b/20 p-4 text-sm text-foreground placeholder-zinc-500 resize-none focus:outline-none focus:border-side-b/50 focus:ring-1 focus:ring-side-b/30 transition-colors"
           required
         />
