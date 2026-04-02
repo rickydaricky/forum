@@ -128,6 +128,26 @@ export async function joinDebate(
   return !!data;
 }
 
+/**
+ * Atomically claim extraction — only succeeds if status is still "pending".
+ * Returns true if we claimed it, false if another client got there first.
+ */
+export async function claimExtraction(id: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("debates")
+    .update({ status: "extracting" })
+    .eq("id", id)
+    .eq("status", "pending")
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return false;
+    throw new Error(`Failed to claim extraction: ${error.message}`);
+  }
+  return !!data;
+}
+
 export async function appendPhase(
   id: string,
   phase: PhaseRecord
