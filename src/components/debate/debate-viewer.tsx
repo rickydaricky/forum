@@ -25,6 +25,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [currentPhase, setCurrentPhase] = useState<DebatePhase | "waiting" | "complete">("waiting");
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [waitingForSideB, setWaitingForSideB] = useState(false);
   const [copied, setCopied] = useState(false);
   const isRunningRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -182,7 +183,19 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       if (!res.ok) {
         throw new Error(`Failed to load debate: HTTP ${res.status}`);
       }
-      const debate: Debate = await res.json();
+      let debate: Debate = await res.json();
+
+      // Poll if waiting for the other side to submit
+      if (debate.status === "waiting_for_side_b") {
+        setWaitingForSideB(true);
+        while (debate.status === "waiting_for_side_b") {
+          await new Promise((r) => setTimeout(r, 3000));
+          const pollRes = await fetch(`/api/debate/${debateId}`);
+          if (!pollRes.ok) throw new Error(`Failed to load debate: HTTP ${pollRes.status}`);
+          debate = await pollRes.json();
+        }
+        setWaitingForSideB(false);
+      }
 
       // Load any completed phases (skip extraction for display)
       if (debate.phases && debate.phases.length > 0) {
@@ -329,8 +342,17 @@ export function DebateViewer({ debateId }: { debateId: string }) {
             );
           })}
 
+          {/* Waiting for Side B */}
+          {waitingForSideB && (
+            <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
+              <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
+              <p className="text-sm mb-2">Waiting for the other side to submit...</p>
+              <p className="text-xs text-zinc-600">This page will update automatically.</p>
+            </div>
+          )}
+
           {/* Waiting state — shown during silent extraction */}
-          {(currentPhase === "waiting" || currentPhase === "extraction") && !error && (
+          {!waitingForSideB && (currentPhase === "waiting" || currentPhase === "extraction") && !error && (
             <div className="flex flex-col items-center justify-center py-24 text-zinc-500">
               <div className="w-8 h-8 border-2 border-zinc-600 border-t-zinc-300 rounded-full animate-spin mb-4" />
               <p className="text-sm">Analyzing both sides...</p>

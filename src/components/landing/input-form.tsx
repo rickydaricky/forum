@@ -14,6 +14,7 @@ export function InputForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteDebateId, setInviteDebateId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   async function handleBothSubmit(e: React.FormEvent) {
@@ -64,6 +65,7 @@ export function InputForm() {
 
       const link = `${window.location.origin}/invite/${data.inviteToken}`;
       setInviteLink(link);
+      setInviteDebateId(data.debateId);
     } catch {
       setError("Failed to connect. Please try again.");
     } finally {
@@ -186,9 +188,17 @@ export function InputForm() {
                 {copied ? "Copied!" : "Copy"}
               </button>
             </div>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-500 mb-4">
               The debate starts automatically once they submit their side.
             </p>
+            {inviteDebateId && (
+              <button
+                onClick={() => router.push(`/debate/${inviteDebateId}`)}
+                className="px-6 py-2.5 rounded-full bg-white text-black font-medium text-sm hover:bg-zinc-200 transition-colors"
+              >
+                Go to Debate Page
+              </button>
+            )}
           </div>
         </div>
       ) : (
