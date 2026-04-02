@@ -165,13 +165,27 @@ export function DebateViewer({ debateId }: { debateId: string }) {
           }
         };
 
-        es.onerror = () => {
+        es.onerror = async () => {
           es.close();
           if (streamCompleted) {
             resolve();
-          } else {
-            reject(new Error(`Connection lost during phase: ${phase}`));
+            return;
           }
+          // Phase might have been completed by another client — check before failing
+          try {
+            const checkRes = await fetch(`/api/debate/${debateId}`);
+            if (checkRes.ok) {
+              const checkDebate: Debate = await checkRes.json();
+              const phaseRecord = checkDebate.phases.find((p) => p.phase === phase);
+              if (phaseRecord?.status === "complete" || checkDebate.status === "completed") {
+                resolve();
+                return;
+              }
+            }
+          } catch {
+            // Fall through to rejection
+          }
+          reject(new Error(`Connection lost during phase: ${phase}`));
         };
       });
     },
@@ -234,20 +248,48 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         return;
       }
 
-      const completedPhaseNames = new Set(
-        (debate.phases || [])
-          .filter((p) => p.status === "complete")
-          .map((p) => p.phase)
-      );
-
       // Run extraction silently if needed
       if (!debate.position_a || !debate.position_b) {
         await startPhaseStream("extraction");
       }
 
-      // Run visible debate phases
+      // Run visible debate phases, re-fetching state after each to pick up
+      // data from a concurrent client (e.g. both sides viewing same debate)
       for (const phase of DEBATE_PHASES) {
-        if (completedPhaseNames.has(phase)) continue;
+        // Re-check debate state before each phase
+        const freshRes = await fetch(`/api/debate/${debateId}`);
+        if (freshRes.ok) {
+          const freshDebate: Debate = await freshRes.json();
+          // Load any phases completed by the other client
+          for (const p of freshDebate.phases) {
+            if (p.phase === "extraction") continue;
+            if (p.status === "complete") {
+              setPhases((prev) => {
+                if (prev.get(p.phase)?.isComplete) return prev;
+                const next = new Map(prev);
+                next.set(p.phase, {
+                  phase: p.phase,
+                  turns: p.turns.map((t) => ({
+                    speaker: t.speaker,
+                    content: t.content,
+                    isStreaming: false,
+                  })),
+                  isComplete: true,
+                });
+                return next;
+              });
+            }
+          }
+          if (freshDebate.status === "completed") {
+            setIsComplete(true);
+            setCurrentPhase("complete");
+            return;
+          }
+          const freshCompleted = new Set(
+            freshDebate.phases.filter((p) => p.status === "complete").map((p) => p.phase)
+          );
+          if (freshCompleted.has(phase)) continue;
+        }
         await startPhaseStream(phase);
       }
     } catch (err) {

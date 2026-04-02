@@ -67,6 +67,21 @@ export async function GET(
     return new Response("Debate not found", { status: 404 });
   }
 
+  // Prevent duplicate phase execution — if this phase already ran, skip it
+  const existingPhase = debate.phases.find((p) => p.phase === phase);
+  if (existingPhase && existingPhase.status === "complete") {
+    return new Response("Phase already completed", { status: 200 });
+  }
+
+  // For extraction: only run if status is still "pending"
+  // For debate phases: only run if not already streaming
+  if (phase === "extraction" && debate.status !== "pending") {
+    return new Response("Extraction already started", { status: 200 });
+  }
+  if (phase !== "extraction" && existingPhase?.status === "streaming") {
+    return new Response("Phase already in progress", { status: 200 });
+  }
+
   const encoder = new TextEncoder();
   let eventId = 0;
 
