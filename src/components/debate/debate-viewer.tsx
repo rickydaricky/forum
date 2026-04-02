@@ -182,8 +182,8 @@ export function DebateViewer({ debateId }: { debateId: string }) {
                 return;
               }
             }
-          } catch {
-            // Fall through to rejection
+          } catch (checkErr) {
+            console.warn("Failed to check debate status after SSE disconnect:", checkErr);
           }
           reject(new Error(`Connection lost during phase: ${phase}`));
         };
@@ -191,6 +191,76 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     },
     [debateId]
   );
+
+  // Passive observer: poll DB every 2s and load completed phases.
+  // Used when another client is already generating the debate.
+  const pollUntilComplete = useCallback(async () => {
+    const MAX_POLL_MS = 5 * 60 * 1000; // 5 minutes
+    const pollStart = Date.now();
+    let consecutiveErrors = 0;
+
+    while (mountedRef.current) {
+      if (Date.now() - pollStart > MAX_POLL_MS) {
+        throw new Error("Debate generation timed out. Please refresh the page.");
+      }
+
+      await new Promise((r) => setTimeout(r, 2000));
+      if (!mountedRef.current) return;
+
+      let debate: Debate;
+      try {
+        const res = await fetch(`/api/debate/${debateId}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        debate = await res.json();
+        consecutiveErrors = 0;
+      } catch {
+        consecutiveErrors++;
+        if (consecutiveErrors >= 5) {
+          throw new Error("Lost connection to the server. Please refresh the page.");
+        }
+        continue;
+      }
+
+      if (debate.input_a_raw) setInputA(debate.input_a_raw);
+      if (debate.input_b_raw) setInputB(debate.input_b_raw);
+
+      // Load completed phases
+      const loaded = new Map<DebatePhase, PhaseData>();
+      for (const p of debate.phases) {
+        if (p.phase === "extraction") continue;
+        if (p.status === "complete") {
+          loaded.set(p.phase, {
+            phase: p.phase,
+            turns: p.turns.map((t) => ({
+              speaker: t.speaker,
+              content: t.content,
+              isStreaming: false,
+            })),
+            isComplete: true,
+          });
+        }
+      }
+      setPhases(loaded);
+
+      // Show which phase is active
+      const activePhase = debate.phases.find((p) => p.status === "streaming");
+      if (activePhase && activePhase.phase !== "extraction") {
+        setCurrentPhase(activePhase.phase);
+      } else if (loaded.size > 0) {
+        const lastComplete = [...loaded.keys()].pop();
+        if (lastComplete) setCurrentPhase(lastComplete);
+      }
+
+      if (debate.status === "completed") {
+        setIsComplete(true);
+        setCurrentPhase("complete");
+        return;
+      }
+      if (debate.status === "error") {
+        throw new Error(debate.error_message || "Debate failed");
+      }
+    }
+  }, [debateId]);
 
   const runAllPhases = useCallback(async () => {
     if (isRunningRef.current) return;
@@ -210,16 +280,25 @@ export function DebateViewer({ debateId }: { debateId: string }) {
       // Poll if waiting for the other side to submit
       if (debate.status === "waiting_for_side_b") {
         setWaitingForSideB(true);
+        let waitErrors = 0;
         while (debate.status === "waiting_for_side_b" && mountedRef.current) {
           await new Promise((r) => setTimeout(r, 3000));
           if (!mountedRef.current) break;
-          const pollRes = await fetch(`/api/debate/${debateId}`);
-          if (!pollRes.ok) throw new Error(`Failed to load debate: HTTP ${pollRes.status}`);
-          debate = await pollRes.json();
+          try {
+            const pollRes = await fetch(`/api/debate/${debateId}`);
+            if (!pollRes.ok) throw new Error(`HTTP ${pollRes.status}`);
+            debate = await pollRes.json();
+            waitErrors = 0;
+          } catch {
+            waitErrors++;
+            if (waitErrors >= 5) {
+              throw new Error("Lost connection. Please refresh the page.");
+            }
+            continue;
+          }
         }
         if (!mountedRef.current) return;
         setWaitingForSideB(false);
-        // Update inputs now that both sides are in
         if (debate.input_a_raw) setInputA(debate.input_a_raw);
         if (debate.input_b_raw) setInputB(debate.input_b_raw);
       }
@@ -248,67 +327,33 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         return;
       }
 
-      // Run extraction silently if needed, or wait for it if another client started it
+      // If another client is already generating, become a passive observer
+      // that polls for results instead of streaming. No race conditions.
+      if (debate.status === "extracting" || debate.status === "in_progress") {
+        await pollUntilComplete();
+        return;
+      }
+
+      // We're the first client (status === "pending") — try to run the pipeline.
+      // If extraction fails (another client claimed it), fall back to polling.
       if (!debate.position_a || !debate.position_b) {
-        if (debate.status === "pending") {
-          // We're the first client — run extraction
+        try {
           await startPhaseStream("extraction");
-        } else {
-          // Another client is already running extraction — poll until it's done
-          while (mountedRef.current) {
-            await new Promise((r) => setTimeout(r, 2000));
-            if (!mountedRef.current) return;
-            const pollRes = await fetch(`/api/debate/${debateId}`);
-            if (!pollRes.ok) throw new Error(`Failed to load debate: HTTP ${pollRes.status}`);
-            const pollDebate: Debate = await pollRes.json();
-            if (pollDebate.position_a && pollDebate.position_b) {
-              debate = pollDebate;
-              break;
-            }
-            if (pollDebate.status === "error") {
-              throw new Error(pollDebate.error_message || "Debate failed");
+        } catch {
+          // Extraction was likely claimed by another client — check and poll
+          const recheckRes = await fetch(`/api/debate/${debateId}`);
+          if (recheckRes.ok) {
+            const recheck: Debate = await recheckRes.json();
+            if (recheck.status === "extracting" || recheck.status === "in_progress" || recheck.status === "completed") {
+              await pollUntilComplete();
+              return;
             }
           }
+          throw new Error("Failed to start debate. Please refresh the page.");
         }
       }
 
-      // Run visible debate phases, re-fetching state after each to pick up
-      // data from a concurrent client (e.g. both sides viewing same debate)
       for (const phase of DEBATE_PHASES) {
-        // Re-check debate state before each phase
-        const freshRes = await fetch(`/api/debate/${debateId}`);
-        if (freshRes.ok) {
-          const freshDebate: Debate = await freshRes.json();
-          // Load any phases completed by the other client
-          for (const p of freshDebate.phases) {
-            if (p.phase === "extraction") continue;
-            if (p.status === "complete") {
-              setPhases((prev) => {
-                if (prev.get(p.phase)?.isComplete) return prev;
-                const next = new Map(prev);
-                next.set(p.phase, {
-                  phase: p.phase,
-                  turns: p.turns.map((t) => ({
-                    speaker: t.speaker,
-                    content: t.content,
-                    isStreaming: false,
-                  })),
-                  isComplete: true,
-                });
-                return next;
-              });
-            }
-          }
-          if (freshDebate.status === "completed") {
-            setIsComplete(true);
-            setCurrentPhase("complete");
-            return;
-          }
-          const freshCompleted = new Set(
-            freshDebate.phases.filter((p) => p.status === "complete").map((p) => p.phase)
-          );
-          if (freshCompleted.has(phase)) continue;
-        }
         await startPhaseStream(phase);
       }
     } catch (err) {
@@ -318,7 +363,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     } finally {
       isRunningRef.current = false;
     }
-  }, [debateId, startPhaseStream]);
+  }, [debateId, startPhaseStream, pollUntilComplete]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -346,7 +391,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       },
-      () => {}
+      () => {
+        window.prompt("Copy this link:", window.location.href);
+      }
     );
   }
 

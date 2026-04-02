@@ -1,4 +1,4 @@
-import { getDebate, updateDebate, appendPhase, updateLatestPhase } from "@/lib/db";
+import { getDebate, updateDebate, appendPhase, updateLatestPhase, claimExtraction } from "@/lib/db";
 import { runExtraction, runDebatePhase } from "@/lib/debate/orchestrator";
 import type { DebateEvent, DebatePhase, PhaseRecord, Speaker } from "@/types";
 
@@ -67,19 +67,21 @@ export async function GET(
     return new Response("Debate not found", { status: 404 });
   }
 
-  // Prevent duplicate phase execution — if this phase already ran, skip it
+  // Prevent duplicate phase execution
   const existingPhase = debate.phases.find((p) => p.phase === phase);
   if (existingPhase && existingPhase.status === "complete") {
     return new Response("Phase already completed", { status: 200 });
   }
-
-  // For extraction: only run if status is still "pending"
-  // For debate phases: only run if not already streaming
-  if (phase === "extraction" && debate.status !== "pending") {
-    return new Response("Extraction already started", { status: 200 });
-  }
   if (phase !== "extraction" && existingPhase?.status === "streaming") {
     return new Response("Phase already in progress", { status: 200 });
+  }
+
+  // For extraction: atomically claim it so only one client runs it
+  if (phase === "extraction") {
+    const claimed = await claimExtraction(id);
+    if (!claimed) {
+      return new Response("Extraction already started", { status: 200 });
+    }
   }
 
   const encoder = new TextEncoder();
@@ -90,21 +92,26 @@ export async function GET(
 
   const stream = new ReadableStream({
     async start(controller) {
+      let clientDisconnected = false;
+
       function send(event: DebateEvent) {
+        if (clientDisconnected) return;
         eventId++;
         const data = `id: ${eventId}\ndata: ${JSON.stringify(event)}\n\n`;
         try {
           controller.enqueue(encoder.encode(data));
         } catch {
-          // Controller closed — client disconnected
+          clientDisconnected = true;
+          console.warn(`Client disconnected during debate ${id}, phase ${phase}`);
         }
       }
 
       function sendKeepalive() {
+        if (clientDisconnected) return;
         try {
           controller.enqueue(encoder.encode(": keepalive\n\n"));
         } catch {
-          // Controller closed
+          clientDisconnected = true;
           if (keepaliveInterval) clearInterval(keepaliveInterval);
         }
       }
@@ -113,8 +120,7 @@ export async function GET(
 
       try {
         if (phase === "extraction") {
-          await updateDebate(id, { status: "extracting" });
-
+          // Status already set to "extracting" by claimExtraction()
           const gen = runExtraction(
             debate.input_a_raw,
             debate.input_b_raw
@@ -133,6 +139,7 @@ export async function GET(
           let stakes = "medium";
 
           while (true) {
+            if (clientDisconnected) break;
             const { value, done } = await gen.next();
             if (done) {
               const result = value as {
@@ -188,6 +195,7 @@ export async function GET(
           const accumulator = createTurnAccumulator(phaseRecord);
 
           for await (const event of gen) {
+            if (clientDisconnected) break;
             send(event);
             accumulator.onEvent(event);
           }
