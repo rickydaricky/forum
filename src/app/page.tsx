@@ -9,9 +9,8 @@ export default function Home() {
 
       <div className="mt-16 text-center text-xs text-zinc-600 max-w-md">
         <p>
-          Paste your AI conversation, a text thread, or just describe your side
-          in your own words. Your input is used only for this debate and stored
-          to enable sharing.
+          Describe what happened from each person&apos;s perspective. Your input
+          is used only for this debate and stored to enable sharing.
         </p>
       </div>
     </main>

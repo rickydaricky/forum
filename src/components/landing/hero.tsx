@@ -5,8 +5,8 @@ export function Hero() {
         Both Takes
       </h1>
       <p className="text-lg sm:text-xl text-zinc-400 max-w-2xl mx-auto leading-relaxed">
-        Paste two sides of a disagreement. Watch AI advocates debate each
-        other. Get a fair ruling from an impartial judge.
+        Two sides. Two AI advocates. One ruling. Settle any disagreement
+        with an impartial AI judge.
       </p>
       <div className="flex justify-center gap-8 mt-8 text-sm text-zinc-500">
         <div className="flex items-center gap-2">

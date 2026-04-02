@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "You've been invited to a debate — Both Takes",
   description:
-    "Someone wants to hear your side. Paste your perspective and an AI judge will weigh in.",
+    "Someone wants to hear your side of a disagreement. Share your perspective and an AI judge will weigh in.",
 };
 
 export default async function InvitePage({
@@ -21,9 +21,9 @@ export default async function InvitePage({
           Your side of the story
         </h1>
         <p className="text-lg text-zinc-400 max-w-xl mx-auto leading-relaxed">
-          Someone submitted their perspective on a disagreement and invited you
-          to share yours. Paste your side below — neither of you can see what
-          the other wrote until the debate begins.
+          Someone submitted their side of a disagreement and invited you to
+          share yours. Neither of you can see what the other wrote until the
+          debate begins.
         </p>
       </div>
       <InviteForm inviteToken={token} />

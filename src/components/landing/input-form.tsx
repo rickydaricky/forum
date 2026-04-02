@@ -125,7 +125,7 @@ export function InputForm() {
               <textarea
                 value={inputA}
                 onChange={(e) => setInputA(e.target.value)}
-                placeholder="Paste the conversation or type the argument directly..."
+                placeholder="Describe what happened from this person's perspective..."
                 className="h-48 rounded-xl bg-surface border border-side-a/20 p-4 text-sm text-foreground placeholder-zinc-500 resize-none focus:outline-none focus:border-side-a/50 focus:ring-1 focus:ring-side-a/30 transition-colors"
                 required
               />
@@ -138,7 +138,7 @@ export function InputForm() {
               <textarea
                 value={inputB}
                 onChange={(e) => setInputB(e.target.value)}
-                placeholder="Paste the conversation or type the argument directly..."
+                placeholder="Describe what happened from this person's perspective..."
                 className="h-48 rounded-xl bg-surface border border-side-b/20 p-4 text-sm text-foreground placeholder-zinc-500 resize-none focus:outline-none focus:border-side-b/50 focus:ring-1 focus:ring-side-b/30 transition-colors"
                 required
               />
@@ -202,7 +202,7 @@ export function InputForm() {
             <textarea
               value={inviteInput}
               onChange={(e) => setInviteInput(e.target.value)}
-              placeholder="Paste your conversation with AI about this disagreement, or write your perspective directly..."
+              placeholder="Describe what happened from your perspective..."
               className="h-64 rounded-xl bg-surface border border-side-a/20 p-4 text-sm text-foreground placeholder-zinc-500 resize-none focus:outline-none focus:border-side-a/50 focus:ring-1 focus:ring-side-a/30 transition-colors"
               required
             />
