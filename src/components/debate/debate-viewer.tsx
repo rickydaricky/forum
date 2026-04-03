@@ -158,44 +158,44 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     ? extractVerdict(judgeRuling.turns.find((t) => t.speaker === "judge")?.content || "")
     : null;
 
-  function handleCopyLink() {
-    navigator.clipboard.writeText(window.location.href).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      () => {
-        window.prompt("Copy this link:", window.location.href);
-      }
-    );
+  function copyToClipboard(text: string, onSuccess: () => void) {
+    navigator.clipboard.writeText(text).then(onSuccess, () => {
+      window.prompt("Copy this:", text);
+    });
   }
 
-  async function handleShareVerdict() {
+  function handleCopyLink() {
+    // Yield a frame so the browser paints button feedback before clipboard work
+    requestAnimationFrame(() => {
+      copyToClipboard(window.location.href, () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    });
+  }
+
+  function handleShareVerdict() {
     const shareText = `AI settled our argument: "${verdict}"`;
     const url = window.location.href;
 
-    // Use native share sheet on mobile only — desktop users prefer clipboard
-    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
-    if (isMobile && navigator.share) {
-      try {
-        await navigator.share({ text: shareText, url });
-        return;
-      } catch {
-        // User cancelled or share failed — fall through to clipboard
+    // Yield a frame so the browser paints button feedback before async work
+    requestAnimationFrame(async () => {
+      // Use native share sheet on mobile only — desktop users prefer clipboard
+      const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+      if (isMobile && navigator.share) {
+        try {
+          await navigator.share({ text: shareText, url });
+          return;
+        } catch {
+          // User cancelled or share failed — fall through to clipboard
+        }
       }
-    }
 
-    // Fallback: copy formatted text to clipboard
-    const clipboardText = `${shareText} See the full debate → ${url}`;
-    navigator.clipboard.writeText(clipboardText).then(
-      () => {
+      copyToClipboard(`${shareText} See the full debate → ${url}`, () => {
         setCopiedVerdict(true);
         setTimeout(() => setCopiedVerdict(false), 2000);
-      },
-      () => {
-        window.prompt("Copy this message:", clipboardText);
-      }
-    );
+      });
+    });
   }
 
   return (
