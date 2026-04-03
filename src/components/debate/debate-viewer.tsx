@@ -30,7 +30,6 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [isComplete, setIsComplete] = useState(false);
   const [waitingForSideB, setWaitingForSideB] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [copiedVerdict, setCopiedVerdict] = useState(false);
   const [inputA, setInputA] = useState<string | null>(null);
   const [inputB, setInputB] = useState<string | null>(null);
   const [showInputs, setShowInputs] = useState(false);
@@ -158,43 +157,31 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     ? extractVerdict(judgeRuling.turns.find((t) => t.speaker === "judge")?.content || "")
     : null;
 
-  function copyToClipboard(text: string, onSuccess: () => void) {
-    navigator.clipboard.writeText(text).then(onSuccess, () => {
-      window.prompt("Copy this:", text);
-    });
-  }
-
-  function handleCopyLink() {
-    // Yield a frame so the browser paints button feedback before clipboard work
-    requestAnimationFrame(() => {
-      copyToClipboard(window.location.href, () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      });
-    });
-  }
-
-  function handleShareVerdict() {
-    const shareText = `AI settled our argument: "${verdict}"`;
+  function handleShare() {
     const url = window.location.href;
 
     // Yield a frame so the browser paints button feedback before async work
     requestAnimationFrame(async () => {
-      // Use native share sheet on mobile only — desktop users prefer clipboard
+      // Native share sheet on mobile — just the URL, OG metadata does the selling
       const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
       if (isMobile && navigator.share) {
         try {
-          await navigator.share({ text: shareText, url });
+          await navigator.share({ url });
           return;
         } catch {
           // User cancelled or share failed — fall through to clipboard
         }
       }
 
-      copyToClipboard(`${shareText} See the full debate → ${url}`, () => {
-        setCopiedVerdict(true);
-        setTimeout(() => setCopiedVerdict(false), 2000);
-      });
+      navigator.clipboard.writeText(url).then(
+        () => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        },
+        () => {
+          window.prompt("Copy this link:", url);
+        }
+      );
     });
   }
 
@@ -208,20 +195,12 @@ export function DebateViewer({ debateId }: { debateId: string }) {
               Both Takes
             </Link>
             <div className="flex gap-2">
-              {isComplete && verdict && (
-                <button
-                  onClick={handleShareVerdict}
-                  className="px-3 py-1.5 text-xs rounded-full bg-judge/20 border border-judge/30 text-judge hover:bg-judge/30 transition-colors"
-                >
-                  {copiedVerdict ? "Copied!" : "Share Verdict"}
-                </button>
-              )}
               {isComplete && (
                 <button
-                  onClick={handleCopyLink}
-                  className="px-3 py-1.5 text-xs rounded-full border border-border hover:border-zinc-500 transition-colors"
+                  onClick={handleShare}
+                  className="px-3 py-1.5 text-xs rounded-full bg-judge/20 border border-judge/30 text-judge hover:bg-judge/30 transition-colors"
                 >
-                  {copied ? "Copied!" : "Copy Link"}
+                  {copied ? "Copied!" : "Share"}
                 </button>
               )}
               <Link
@@ -259,10 +238,10 @@ export function DebateViewer({ debateId }: { debateId: string }) {
               </p>
               <div className="flex items-center gap-3 mt-4">
                 <button
-                  onClick={handleShareVerdict}
+                  onClick={handleShare}
                   className="px-4 py-2 text-xs font-medium rounded-full bg-judge/20 border border-judge/30 text-judge hover:bg-judge/30 transition-colors"
                 >
-                  {copiedVerdict ? "Copied!" : "Share This Verdict"}
+                  {copied ? "Copied!" : "Share This Verdict"}
                 </button>
                 <span className="text-xs text-zinc-600">Read the full debate below</span>
               </div>
