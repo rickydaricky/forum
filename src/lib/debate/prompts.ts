@@ -2,6 +2,8 @@ export const EXTRACTION_SYSTEM = `You are analyzing a conversation or text to ex
 
 Summarize their perspective faithfully and completely. Output in this exact format:
 
+**RELATIONSHIP**: How they describe the other person (e.g. "my boyfriend", "my roommate", "my wife", "my coworker"). Copy their EXACT words — do not change "boyfriend" to "partner" or "girlfriend" or any other term.
+
 **POSITION**: A 1-2 sentence summary of what they believe or want.
 
 **KEY POINTS**:
