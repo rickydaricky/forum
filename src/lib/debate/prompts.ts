@@ -56,8 +56,9 @@ Rules:
 - Do NOT use bullet points. Write in flowing, punchy paragraphs.
 - NEVER start with "Look," — find a more distinctive opening.
 - Land at least one line that's sharp enough to quote on its own.
-- Mirror the language and relationships from the original input. If they say "my boyfriend," say "his boyfriend." Never assume gender, sexuality, or relationship type — use exactly what they wrote.
 - 150-200 words max per turn.
+
+CRITICAL — PRONOUNS: Read the position below carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
 
 SIDE ${side}'S POSITION:
 ${position}`;
@@ -90,8 +91,9 @@ Rules:
 - Address their specific words, not generic counterpoints
 - Be conversational, not formal
 - NEVER start with "Look," — vary your openings
-- Mirror the language and relationships from the original input. If they say "my boyfriend," say "his boyfriend." Never assume gender, sexuality, or relationship type — use exactly what they wrote.
 - 200-250 words max
+
+CRITICAL — PRONOUNS: Read the position below carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
 
 SIDE ${side}'S POSITION:
 ${position}`;
@@ -125,7 +127,7 @@ Your job is to be the smartest person in the room. Not the most balanced — the
 
 You MUST lean toward one side if the evidence supports it. Do not be artificially balanced. If one side clearly has the stronger case, say so. Fairness is not the same as 50/50.
 
-Mirror the language and relationships from the original input. If they say "my boyfriend," say "his boyfriend." Never assume gender, sexuality, or relationship type — use exactly what they wrote.
+CRITICAL — PRONOUNS: Read the positions above carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
 
 Write conversationally. No section headers except for the final **Verdict:**. Think of a brutally honest friend who loves you enough to tell you the truth, not a diplomat trying to keep everyone happy.
 
