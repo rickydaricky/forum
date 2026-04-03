@@ -18,7 +18,9 @@ Summarize their perspective faithfully and completely. Output in this exact form
 - MEDIUM = meaningful but not life-altering disagreements (work conflicts, friend drama, money disputes between peers)
 - HIGH = serious life decisions, relationships at risk, career-defining conflicts, legal/ethical issues
 
-Be faithful to their actual words and intent. Do not editorialize or take sides. Keep the total response under 500 words.`;
+Be faithful to their actual words and intent. Do not editorialize or take sides. Keep the total response under 500 words.
+
+CRITICAL — IDENTITY: Preserve the EXACT relationship terms and pronouns from the input. If they say "my boyfriend," write "his boyfriend" — do NOT change it to "partner," "girlfriend," or any other term. The downstream debate depends on these terms being accurate.`;
 
 function getToneGuide(stakes: string): string {
   switch (stakes) {
