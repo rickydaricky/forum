@@ -68,14 +68,44 @@ function parseStakes(extractionA: string, extractionB: string): string {
   return "medium";
 }
 
+/** Parse RELATIONSHIP terms from extraction outputs, return a pronoun guide string. */
+function buildPronounGuide(extractionA: string, extractionB: string): string {
+  const matchA = extractionA.match(/\*\*RELATIONSHIP\*\*:\s*(.+)/i);
+  const matchB = extractionB.match(/\*\*RELATIONSHIP\*\*:\s*(.+)/i);
+  const relA = matchA?.[1]?.trim().toLowerCase() ?? "";
+  const relB = matchB?.[1]?.trim().toLowerCase() ?? "";
+
+  // Detect if both sides use the same gendered term
+  const maleTerms = ["boyfriend", "husband", "brother", "father", "son", "dad"];
+  const femaleTerms = ["girlfriend", "wife", "sister", "mother", "daughter", "mom"];
+
+  const aIsMale = maleTerms.some((t) => relA.includes(t));
+  const bIsMale = maleTerms.some((t) => relB.includes(t));
+  const aIsFemale = femaleTerms.some((t) => relA.includes(t));
+  const bIsFemale = femaleTerms.some((t) => relB.includes(t));
+
+  const parts: string[] = [];
+  if (relA) parts.push(`Side A describes the other person as "${matchA![1].trim()}".`);
+  if (relB) parts.push(`Side B describes the other person as "${matchB![1].trim()}".`);
+
+  if (aIsMale && bIsMale) {
+    parts.push("Both people are male. Use he/him for both. Do NOT use she/her/girlfriend/woman.");
+  } else if (aIsFemale && bIsFemale) {
+    parts.push("Both people are female. Use she/her for both. Do NOT use he/him/boyfriend/man.");
+  }
+
+  return parts.length > 0 ? parts.join(" ") : "";
+}
+
 async function* openingStatement(
   side: "A" | "B",
   position: string,
   opposingPosition: string,
-  stakes: string
+  stakes: string,
+  pronounGuide: string
 ): AsyncGenerator<DebateEvent, string> {
   const speaker: Speaker = side === "A" ? "advocate_a" : "advocate_b";
-  const system = getAdvocateSystem(side, position, stakes);
+  const system = getAdvocateSystem(side, position, stakes, pronounGuide);
 
   return yield* streamClaude(
     system,
@@ -95,10 +125,11 @@ async function* responseTurn(
   position: string,
   openingA: string,
   openingB: string,
-  stakes: string
+  stakes: string,
+  pronounGuide: string
 ): AsyncGenerator<DebateEvent, string> {
   const speaker: Speaker = side === "A" ? "advocate_a" : "advocate_b";
-  const system = getResponseSystem(side, position, stakes);
+  const system = getResponseSystem(side, position, stakes, pronounGuide);
   const opposingOpening = side === "A" ? openingB : openingA;
 
   return yield* streamClaude(
@@ -123,14 +154,15 @@ export async function* runDebatePhase(
   positionA: string,
   positionB: string,
   existingTranscript: string,
-  stakes: string = "medium"
+  stakes: string = "medium",
+  pronounGuide: string = ""
 ): AsyncGenerator<DebateEvent> {
   switch (phase) {
     case "opening": {
       yield { type: "phase_start", phase: "opening" };
 
-      const openingA = yield* openingStatement("A", positionA, positionB, stakes);
-      const openingB = yield* openingStatement("B", positionB, positionA, stakes);
+      const openingA = yield* openingStatement("A", positionA, positionB, stakes, pronounGuide);
+      const openingB = yield* openingStatement("B", positionB, positionA, stakes, pronounGuide);
 
       void openingA;
       void openingB;
@@ -154,8 +186,8 @@ export async function* runDebatePhase(
         }
       }
 
-      yield* responseTurn("A", positionA, openingA, openingB, stakes);
-      yield* responseTurn("B", positionB, openingA, openingB, stakes);
+      yield* responseTurn("A", positionA, openingA, openingB, stakes, pronounGuide);
+      yield* responseTurn("B", positionB, openingA, openingB, stakes, pronounGuide);
 
       yield { type: "phase_complete", phase: "response" };
       break;
@@ -164,7 +196,7 @@ export async function* runDebatePhase(
     case "ruling": {
       yield { type: "phase_start", phase: "ruling" };
 
-      const judgeSystem = getJudgeSystem(positionA, positionB, stakes);
+      const judgeSystem = getJudgeSystem(positionA, positionB, stakes, pronounGuide);
       yield* streamClaude(
         judgeSystem,
         [
@@ -199,13 +231,14 @@ export async function* runDebatePhase(
 export async function* runExtraction(
   inputA: string,
   inputB: string
-): AsyncGenerator<DebateEvent, { positionA: string; positionB: string; stakes: string }> {
+): AsyncGenerator<DebateEvent, { positionA: string; positionB: string; stakes: string; pronounGuide: string }> {
   yield { type: "phase_start", phase: "extraction" };
 
   const positionA = yield* extractPosition(inputA, "advocate_a");
   const positionB = yield* extractPosition(inputB, "advocate_b");
 
   const stakes = parseStakes(positionA, positionB);
+  const pronounGuide = buildPronounGuide(positionA, positionB);
 
   yield {
     type: "extraction_complete",
@@ -215,5 +248,5 @@ export async function* runExtraction(
   };
   yield { type: "phase_complete", phase: "extraction" };
 
-  return { positionA, positionB, stakes };
+  return { positionA, positionB, stakes, pronounGuide };
 }

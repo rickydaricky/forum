@@ -67,14 +67,16 @@ async function runPipeline(id: string, inputA: string, inputB: string) {
     let positionA = "";
     let positionB = "";
     let stakes = "medium";
+    let pronounGuide = "";
 
     while (true) {
       const { value, done } = await extractionGen.next();
       if (done) {
-        const result = value as { positionA: string; positionB: string; stakes: string };
+        const result = value as { positionA: string; positionB: string; stakes: string; pronounGuide: string };
         positionA = result.positionA;
         positionB = result.positionB;
         stakes = result.stakes;
+        pronounGuide = result.pronounGuide;
         break;
       }
       accumulator.onEvent(value);
@@ -104,7 +106,7 @@ async function runPipeline(id: string, inputA: string, inputB: string) {
       await appendPhase(id, phaseRecord);
 
       const phaseAccumulator = createTurnAccumulator(phaseRecord);
-      const gen = runDebatePhase(phase, positionA, positionB, transcript, stakes);
+      const gen = runDebatePhase(phase, positionA, positionB, transcript, stakes, pronounGuide);
 
       for await (const event of gen) {
         phaseAccumulator.onEvent(event);
