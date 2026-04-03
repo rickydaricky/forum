@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { posthog } from "@/lib/posthog";
 import { PhaseIndicator } from "./phase-indicator";
 import { PhaseSection } from "./phase-section";
 import type { DebatePhase, Speaker } from "@/types";
@@ -159,6 +160,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
 
   function handleShare() {
     const url = window.location.href;
+    posthog.capture("share_clicked", { debate_id: debateId, has_verdict: !!verdict });
 
     // Yield a frame so the browser paints button feedback before async work
     requestAnimationFrame(async () => {
