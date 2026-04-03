@@ -30,6 +30,7 @@ export function DebateViewer({ debateId }: { debateId: string }) {
   const [isComplete, setIsComplete] = useState(false);
   const [waitingForSideB, setWaitingForSideB] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedVerdict, setCopiedVerdict] = useState(false);
   const [inputA, setInputA] = useState<string | null>(null);
   const [inputB, setInputB] = useState<string | null>(null);
   const [showInputs, setShowInputs] = useState(false);
@@ -169,6 +170,33 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     );
   }
 
+  async function handleShareVerdict() {
+    const shareText = `AI settled our argument: "${verdict}"`;
+    const url = window.location.href;
+
+    // Use native share sheet on mobile (iOS Safari, Android Chrome, etc.)
+    if (navigator.share) {
+      try {
+        await navigator.share({ text: shareText, url });
+        return;
+      } catch {
+        // User cancelled or share failed — fall through to clipboard
+      }
+    }
+
+    // Fallback: copy formatted text to clipboard
+    const clipboardText = `${shareText} See the full debate → ${url}`;
+    navigator.clipboard.writeText(clipboardText).then(
+      () => {
+        setCopiedVerdict(true);
+        setTimeout(() => setCopiedVerdict(false), 2000);
+      },
+      () => {
+        window.prompt("Copy this message:", clipboardText);
+      }
+    );
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -179,6 +207,14 @@ export function DebateViewer({ debateId }: { debateId: string }) {
               Both Takes
             </Link>
             <div className="flex gap-2">
+              {isComplete && verdict && (
+                <button
+                  onClick={handleShareVerdict}
+                  className="px-3 py-1.5 text-xs rounded-full bg-judge/20 border border-judge/30 text-judge hover:bg-judge/30 transition-colors"
+                >
+                  {copiedVerdict ? "Copied!" : "Share Verdict"}
+                </button>
+              )}
               {isComplete && (
                 <button
                   onClick={handleCopyLink}
@@ -220,7 +256,15 @@ export function DebateViewer({ debateId }: { debateId: string }) {
               <p className="text-base font-medium text-zinc-100 leading-relaxed">
                 {verdict}
               </p>
-              <p className="text-xs text-zinc-500 mt-3">Read the full debate below</p>
+              <div className="flex items-center gap-3 mt-4">
+                <button
+                  onClick={handleShareVerdict}
+                  className="px-4 py-2 text-xs font-medium rounded-full bg-judge/20 border border-judge/30 text-judge hover:bg-judge/30 transition-colors"
+                >
+                  {copiedVerdict ? "Copied!" : "Share This Verdict"}
+                </button>
+                <span className="text-xs text-zinc-600">Read the full debate below</span>
+              </div>
             </div>
           )}
 
