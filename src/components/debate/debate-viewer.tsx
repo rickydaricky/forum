@@ -174,8 +174,9 @@ export function DebateViewer({ debateId }: { debateId: string }) {
     const shareText = `AI settled our argument: "${verdict}"`;
     const url = window.location.href;
 
-    // Use native share sheet on mobile (iOS Safari, Android Chrome, etc.)
-    if (navigator.share) {
+    // Use native share sheet on mobile only — desktop users prefer clipboard
+    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    if (isMobile && navigator.share) {
       try {
         await navigator.share({ text: shareText, url });
         return;
