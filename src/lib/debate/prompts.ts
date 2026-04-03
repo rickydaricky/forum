@@ -38,7 +38,8 @@ function getToneGuide(stakes: string): string {
 export function getAdvocateSystem(
   side: "A" | "B",
   position: string,
-  stakes: string = "medium"
+  stakes: string = "medium",
+  pronounGuide: string = ""
 ): string {
   const styleGuide =
     side === "A"
@@ -62,7 +63,7 @@ Rules:
 - Land at least one line that's sharp enough to quote on its own.
 - 150-200 words max per turn.
 
-CRITICAL — PRONOUNS: Read the position below carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
+${pronounGuide ? `PRONOUNS: ${pronounGuide}` : ""}
 
 SIDE ${side}'S POSITION:
 ${position}`;
@@ -71,7 +72,8 @@ ${position}`;
 export function getResponseSystem(
   side: "A" | "B",
   position: string,
-  stakes: string = "medium"
+  stakes: string = "medium",
+  pronounGuide: string = ""
 ): string {
   const styleGuide =
     side === "A"
@@ -97,7 +99,7 @@ Rules:
 - NEVER start with "Look," — vary your openings
 - 200-250 words max
 
-CRITICAL — PRONOUNS: Read the position below carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
+${pronounGuide ? `PRONOUNS: ${pronounGuide}` : ""}
 
 SIDE ${side}'S POSITION:
 ${position}`;
@@ -106,7 +108,8 @@ ${position}`;
 export function getJudgeSystem(
   positionA: string,
   positionB: string,
-  stakes: string = "medium"
+  stakes: string = "medium",
+  pronounGuide: string = ""
 ): string {
   return `You are the Judge in "Both Takes." You've watched two advocates debate. Now deliver your ruling.
 
@@ -131,7 +134,7 @@ Your job is to be the smartest person in the room. Not the most balanced — the
 
 You MUST lean toward one side if the evidence supports it. Do not be artificially balanced. If one side clearly has the stronger case, say so. Fairness is not the same as 50/50.
 
-CRITICAL — PRONOUNS: Read the positions above carefully. Use ONLY the gender, pronouns, and relationship terms that appear in the input. If both sides say "my boyfriend," both people are male — use he/him for both. Do NOT introduce "she/her/girlfriend/woman" unless those words appear in the original input.
+${pronounGuide ? `PRONOUNS: ${pronounGuide}` : ""}
 
 Write conversationally. No section headers except for the final **Verdict:**. Think of a brutally honest friend who loves you enough to tell you the truth, not a diplomat trying to keep everyone happy.
 
